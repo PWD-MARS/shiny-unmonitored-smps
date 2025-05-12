@@ -49,8 +49,14 @@
     
     #set db connection
     #gets environmental variables saved in local or pwdrstudio environment
-    poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
-    
+    #poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+    poolConn <- dbPool(RPostgres::Postgres(),
+                       host = "PWDMARSDBS1.pwd.phila.local",
+                       port = 5434,
+                       dbname = "sandbox_dtime",
+                       user = Sys.getenv("shiny_uid"),
+                       password = Sys.getenv("shiny_pwd")
+    )
     #GSO DB
     # gso_db <- paste0("MSSQL:server=PWDGISSQL;",
     #                  "database=GSODB;",
@@ -159,7 +165,7 @@
     clustered_population_db <- dbGetQuery(poolConn,"SELECT * from  fieldwork.tbl_clustered_systems")
     
     # Monitoring the deployment records to generate sensor_deployed column
-    deployed_systems <- dbGetQuery(poolConn,"select distinct admin.fun_smp_to_system(smp_id) as system_id, deployment_dtime_est from fieldwork.viw_deployment_full_cwl")
+    deployed_systems <- dbGetQuery(poolConn,"select distinct admin.fun_smp_to_system(smp_id) as system_id, deployment_dtime from fieldwork.viw_deployment_full_cwl")
     # all smps
     smpbdv_df <- dbGetQuery(poolConn,"SELECT distinct system_id, smp_id FROM external.tbl_smpbdv")
     
@@ -177,7 +183,7 @@
     
     # only deployments after the sample generation date-this is to avoid counting the past deployments with no data
     deployed_systems <- deployed_systems %>%
-      filter(deployment_dtime_est > deployment_date_cutoff)
+      filter(deployment_dtime > deployment_date_cutoff)
     
     # mutate sensors deployed based on deployment records
     clustered_samples_db <- clustered_samples_db %>% 
