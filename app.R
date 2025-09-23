@@ -47,7 +47,13 @@
     
     #set db connection
     #gets environmental variables saved in local or pwdrstudio environment
-    poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+    poolConn <- dbPool(RPostgres::Postgres(),
+                       host = "PWDMARSDBS1.pwd.phila.local",
+                       port = 5434,
+                       dbname = "mars_prod",
+                       user = Sys.getenv("shiny_uid"),
+                       password = Sys.getenv("shiny_pwd")
+    )
     
     #GSO DB
     # gso_db <- paste0("MSSQL:server=PWDGISSQL;",
