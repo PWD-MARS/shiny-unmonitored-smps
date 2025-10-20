@@ -194,13 +194,7 @@
     
     # greenit to get the smp-type
     smpbdv_df <- dbGetQuery(poolConn,"SELECT system_id, smp_id, smp_smptype FROM external.tbl_smpbdv")
-    
-  # Get the maintenance district map- disabled since SF doesn't work on RStudio Connect Server 
-    # Maint_Dist_db <- suppressWarnings(st_read(gso_db, "GSOADMIN.GSWI_MAINTENANCE_DISTRICTS", quiet = TRUE))
-    
-   
-    
-    
+
     
 # 1.0 UI --------
 ui <-  navbarPage("MARS Unmonitored Active SMPs", theme = shinytheme("cerulean"),
