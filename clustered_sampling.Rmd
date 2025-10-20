@@ -55,10 +55,31 @@ params:
 The aim of this analysis is to analyze SMP population using CWL monitoring data, categorize it, and identify underrepresented SMP features in our data set. We will also use clustering to group systems with similar characteristics and develop a stratified sampling script to randomly select a representative sample of systems proportional to their cluster and system type. This will ensure a comprehensive data set covering all types of SMPs with varying design metrics such as loading ratios, drainage area, and storm size management. The output of this analysis will help the data collection team with their future site selection.
 
 ```{r data gathering, include=FALSE}
+
+
+
    sysbdv <- dbGetQuery(con,"SELECT * FROM external.tbl_systembdv")
-   unmonitored_smp <- dbGetQuery(con," SELECT * FROM fieldwork.viw_unmonitored_postcon_on")   
-    
-    
+   smpbdv_df <- dbGetQuery(con,"SELECT distinct system_id, smp_id FROM external.tbl_smpbdv")
+  
+   unmonitored_smp <- dbGetQuery(con," SELECT * FROM fieldwork.viw_unmonitored_postcon_on")
+   
+   random_bateches <- dbGetQuery(con," SELECT * FROM fieldwork.tbl_clustered_samples")
+   
+   #systems in which all smps are NOT available
+   system_with_null_smps <- smpbdv_df %>%
+     left_join(unmonitored_smp, by = c("system_id","smp_id"), multiple = "all") %>%
+     filter(is.na(smp_type)) %>%
+     select(system_id) %>%
+     distinct() 
+   
+   #Remove incomplete systems
+   unmonitored_smp <- unmonitored_smp %>%
+     anti_join(system_with_null_smps, by = "system_id")  
+   
+   #Remove the previous bateches
+   unmonitored_smp <- unmonitored_smp %>%
+     anti_join(random_bateches, by = "system_id")
+   
     #add the design metrics to the unmonitored smp list and renaming the loading ratio coloumn
     table_all <- unmonitored_smp %>%
   left_join(sysbdv, by="system_id") %>%
@@ -118,11 +139,11 @@ normalized_cluster[,2:3] <- scale(clustered_Bioreten_lined[,2:3])
 
 #Elbow method 
 #number of clusters
-elbow_lined_fig <- fviz_nbclust(normalized_cluster[,2:3], kmeans, method = "wss")
+#elbow_lined_fig <- fviz_nbclust(normalized_cluster[,2:3], kmeans, method = "wss")
 
 #k-means 
 # Cluster using kmeans with five clusters
-cluster_solution <- kmeans(normalized_cluster[,2:3], centers = 3)
+cluster_solution <- kmeans(normalized_cluster[,2:3], centers = 1)
 
 # Store the cluster assignments back into the clustering data frame object
 clustered_Bioreten_lined$cluster <-factor(cluster_solution$cluster) 
@@ -153,11 +174,11 @@ normalized_cluster[,2:4] <- scale(clustered_Bioreten_unlined[,2:4])
 
 #Elbow method 
 #number of clusters
-elbow_lined_fig <- fviz_nbclust(normalized_cluster[,2:4], kmeans, method = "wss")
+#elbow_lined_fig <- fviz_nbclust(normalized_cluster[,2:4], kmeans, method = "wss")
 
 #k-means 
 # Cluster using kmeans with five clusters
-cluster_solution <- kmeans(normalized_cluster[,2:4], centers = 2)
+cluster_solution <- kmeans(normalized_cluster[,2:4], centers = 1)
 
 # Store the cluster assignments back into the clustering data frame object
 clustered_Bioreten_unlined$cluster <-factor(cluster_solution$cluster) 
@@ -415,7 +436,8 @@ sys_clustered_all["batch_id"] <- current_batch_id + 1
   #keep only one address per system if multiple exists
   db_table <- clustered_systems_table_ad %>%
     group_by(system_id) %>%
-    mutate(address = paste(address, collapse = ', ')) %>%
+    mutate(address = paste(address, collapse = ', '),           date_generated = Sys.Date(),
+) %>%
     distinct()
   
   ###write to db 
@@ -425,6 +447,32 @@ sys_clustered_all["batch_id"] <- current_batch_id + 1
       
     }
 
+
+
+```
+
+```{r sample 0.1 size of the population write to db, include=FALSE}
+    #create sample id
+    current_sample_id <- dbGetQuery(con,"SELECT max(sample_id) FROM fieldwork.tbl_clustered_samples") %>% pull
+
+  #add the sample id to the table
+    new_sample_id <- current_sample_id + 1
+   #creating the random samples based on various fraction sizes
+   stratified_sample_0.15 <- db_table %>%
+     select(-batch_id) %>%
+     group_by(sys_modelinputcategory, cluster) %>%
+     sample_frac(size= 0.15) %>%
+     mutate(sample_id = new_sample_id,
+            desktop_analysis = "Not Determined",
+            pre_inspection = "Not Determined",
+            alternative = NULL)
+   
+   ###write to db 
+    if(params$write == TRUE ){
+      
+  dbWriteTable (con, SQL("fieldwork.tbl_clustered_samples"), stratified_sample_0.15, append= TRUE, row.names = FALSE)
+      
+    }
 
 
 ```
